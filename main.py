@@ -1,16 +1,13 @@
 import cv2
+import time
+import math
 import win32api
 import win32gui
 import win32con
 import numpy as np
 from PIL import ImageGrab, Image
-import time
-import math
 from pynput.mouse import Controller
-
-window_name = "League of Legends (TM) Client"
-hwnd = win32gui.FindWindow(0, window_name)
-hdc = win32gui.GetDC(hwnd)
+from overlay import *
 
 mouse = Controller()
 
@@ -19,11 +16,6 @@ upper = np.array([0, 11, 97])
 
 kernel0 = np.ones((7,7), np.uint8)
 kernel1 = np.ones((20,20), np.uint8)
-
-w = win32api.GetSystemMetrics(0)
-h = win32api.GetSystemMetrics(1)
-
-print(w,h)
 
 def nothing(x):
     pass
@@ -49,6 +41,11 @@ def screen_filter(screen):
     mask = cv2.inRange(screen, lower, upper)
     return mask
 
+def find_elements_on_screen(screen, lower, upper):
+    mask = cv2.inRange(screen, lower, upper)
+    mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel0)
+    mask = cv2.dilate(mask, kernel1, iterations = 1)
+    return mask    
 
 def find_enemies(screen):
     enemies = []
@@ -61,19 +58,20 @@ def find_enemies(screen):
         approx = cv2.approxPolyDP(cnt, 0.01*cv2.arcLength(cnt, True), True)
         if 8 <= approx.size <= 12:
             x, y, w, h = cv2.boundingRect(approx)
-            _x = x + w + 49
-            _y = y + h + 57
+            _x, _y = (
+                x + w + 49,
+                y + h + 57
+            )
             enemies.append((_x,_y))
-    return mask, enemies
+    return enemies
 
 def calculate_distance(p1, p2):
     x1, y1 = p1
     x2, y2 = p2
     return math.hypot(x1-x2, y1-y2)
 
-
 def lock_enemy(enemies):
-    min_dist = 999999999999
+    min_dist = 999
     min_enemy = None
     for enemy in enemies:
         dist = calculate_distance(win32api.GetCursorPos(), enemy)
@@ -83,33 +81,69 @@ def lock_enemy(enemies):
     if not min_enemy is None:
         mouse.position = min_enemy
 
-""" cv2.namedWindow("trackbar")
-cv2.createTrackbar("L-B", "trackbar", 0, 255, nothing)
-cv2.createTrackbar("L-G", "trackbar", 0, 255, nothing)
-cv2.createTrackbar("L-R", "trackbar", 0, 255, nothing)
-cv2.createTrackbar("U-B", "trackbar", 0, 255, nothing)
-cv2.createTrackbar("U-G", "trackbar", 0, 255, nothing)
-cv2.createTrackbar("U-R", "trackbar", 0, 255, nothing) """
+def find_allies(screen):
+    allies = []
+    lower = np.array([35, 25, 0])
+    upper = np.array([49, 35, 4])
+    mask = cv2.inRange(screen, lower, upper)
+    mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel0)
+    mask = cv2.dilate(mask, kernel1, iterations = 1)
+    ret = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+    contours = ret[0] if len(ret) == 2 else ret[1]
+    for cnt in contours:
+        approx = cv2.approxPolyDP(cnt, 0.01*cv2.arcLength(cnt, True), True)
+        if 8 <= approx.size <= 12:
+            x, y, w, h = cv2.boundingRect(approx)
+            _x, _y = (
+                x + w - 2,
+                y + h - 22
+            )
+            allies.append((_x,_y))
+    return allies
+
+def local_player(screen, players):
+    life = np.array([41, 146, 66])
+    player = None
+    for x,y in players:
+        if np.array_equal(screen[y][x], life):
+            player = (
+                x + 38,
+                y + 79
+            )
+            break
+    return player
 
 if __name__ == "__main__":
-    
+
+    color = lambda rgb: "#%02x%02x%02x"%(rgb)
+
     while not win32api.GetAsyncKeyState(win32con.VK_ESCAPE):
         img = get_screen()        
 
-        mask, enemies = find_enemies(img)
+        enemies = find_enemies(img)
 
-        for e in enemies:
-            cv2.circle(img, e, 35, (255,0,255),thickness=3)
+        allies = find_allies(img)
 
-        if win32api.GetAsyncKeyState(win32con.VK_MENU):
+        e = local_player(img, allies)
+
+        if not e is None:
+            draw_center_square(e, 30, 0x00ff00ff)
+
+        for i in enemies:
+            draw_center_square(i, 30, 0x000000FF)
+
+            draw_line(e,i, 0x000000FF)
+
+
+        if win32api.GetAsyncKeyState(win32con.VK_SHIFT):
             lock_enemy(enemies)
             
         #cv2.imshow("frame", img)
         #cv2.imshow("mask", mask)
 
-        #if cv2.waitKey(25) & 0xFF == ord('q'):
-            #cv2.destroyAllWindows()
-            #break 
+        if cv2.waitKey(25) & 0xFF == ord('q'):
+            cv2.destroyAllWindows()
+            break 
    
             
 

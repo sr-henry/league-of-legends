@@ -11,7 +11,7 @@ fuchsia = (255, 0, 128)
 class FancyFrame(wx.Frame):
     def __init__(self):
         style = ( wx.CLIP_CHILDREN | wx.STAY_ON_TOP | wx.FRAME_NO_TASKBAR | wx.NO_BORDER )
-        wx.Frame.__init__(self, None, title='Fancy', style = style, size= wx.Size(w,h))
+        wx.Frame.__init__(self, None, title='OverlayFrame', style = style, size= wx.Size(w,h))
         self.SetBackgroundColour(fuchsia)
         win32gui.SetWindowLong(self.GetHandle(), win32con.GWL_EXSTYLE, win32gui.GetWindowLong(self.GetHandle(), win32con.GWL_EXSTYLE) | win32con.WS_EX_LAYERED)
         win32gui.SetLayeredWindowAttributes(self.GetHandle(), win32api.RGB(*fuchsia), 0, win32con.LWA_COLORKEY)
@@ -24,16 +24,10 @@ class FancyFrame(wx.Frame):
 
         self.Show()
 
-    def evt_timer(self,event):
+    def evt_timer(self,event):  
         self.Refresh()
 
-
-        
-        
-
 app = wx.App()
-
-
 
 FancyFrame()
 
