@@ -18,7 +18,7 @@ class FancyFrame(wx.Frame):
         
         self.timer=wx.Timer(self)
 
-        self.timer.Start(0)
+        self.timer.Start(125)
     
         self.Bind(wx.EVT_TIMER, self.evt_timer)
 
