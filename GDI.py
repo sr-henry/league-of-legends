@@ -1,11 +1,10 @@
 import win32api
 import win32gui
 import win32con
-
-class GDIDraw(object):
-    def __init__(self):
-        self.window_name = "OverlayFrame"
-        self.hwnd = win32gui.FindWindow(0, self.window_name)
+        
+class GDIDraw:
+    def __init__(self, window_name = "OverlayFrame"):
+        self.hwnd = win32gui.FindWindow(0, window_name)
         self.hdc = win32gui.GetDC(self.hwnd)
     
     def brush(self, color):
@@ -54,3 +53,14 @@ class GDIDraw(object):
         hoPen = win32gui.SelectObject(self.hdc, pen)
         win32gui.Arc(self.hdc, x-r_alpha, y-r_beta, x+r_alpha, y+r_beta,0,0,0,0)
         win32gui.DeleteObject(win32gui.SelectObject(self.hdc, hoPen))
+    
+    def text(self, string, rc):
+        #rc = win32gui.GetClientRect(self.hwnd) 
+        win32gui.DrawText(self.hdc, string, -1, rc, win32con.DT_CENTER|win32con.DT_VCENTER|win32con.DT_SINGLELINE|win32con.DT_NOCLIP)
+
+if __name__ == "__main__":
+    draw = GDIDraw()
+    while not win32api.GetAsyncKeyState(win32con.VK_ESCAPE):
+        draw.text("Hello")
+
+
