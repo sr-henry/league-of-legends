@@ -6,7 +6,6 @@ import win32con
 import win32gui
 import threading
 import numpy as np
-from pynput.mouse import Controller
 
 from wnd_cap import capture
 from GDI import GDIDraw
@@ -110,7 +109,7 @@ def find_enemies(img):
 def min_entity(entities):
     md = math.inf
     me = None
-    m = Vec2(*mouse.position)
+    m = Vec2(*win32api.GetCursorPos())
     for e in entities:
         d = (e-m).h
         if d < md:
@@ -139,13 +138,14 @@ def evade(p0, p1, a):
     v = Vec2(dx,dy)
     return p1 + v
 
+def move(x,y):
+    x0, y0 = win32api.GetCursorPos()
+    win32api.mouse_event(0x0001, x-x0, y-y0, 0, 0)
  
 if __name__ == '__main__':
     
     gdi = GDIDraw()
-
-    mouse = Controller()
-    
+        
     print('[@] League-of-Legends Skill-Shot AimBot')
         
     hwnd = win32gui.FindWindow(0, 'League of Legends (TM) Client')
@@ -165,38 +165,35 @@ if __name__ == '__main__':
     pre.start()
 
     ## Evade angle
-    alpha = 20
+    alpha = 15
 
-    print('angle: ', alpha)
-    
     while not win32api.GetAsyncKeyState(win32con.VK_HOME):            
         if not cap.img is None:
 
             e = min_entity(find_enemies(cap.img))
             p = local_player(cap.img)
-
-            if e:
-                gdi.circle(e.value, 30, 2, (255,0,255))
-        
-                if pre.pred:
-                    gdi.line(e.value, pre.pred.ivalue, 3, (0,255,0))
-
-            if p and e:
-                gdi.line(p.value, e.value, 2, (255,255,255))
-
-                ## Get evade pos for a positive angle
-                eva = evade(e, p, math.radians(alpha))
-                gdi.line(p.value, eva.ivalue, 2, (255,255,0))
-
-                ## Get evade pos for a negative angle
-                eva = evade(e, p, -math.radians(alpha))
-                gdi.line(p.value, eva.ivalue, 2, (0,255,255))
-                
+ 
             if win32api.GetAsyncKeyState(0x51) or\
                 win32api.GetAsyncKeyState(0x57) or\
                 win32api.GetAsyncKeyState(0x52):
-
                 if e:
-                    mouse.position = e.value
+                    move(*e.value) 
+            
+            if p and e:
+                gdi.circle(e.value, 30, 1, (255,0,255))
+     
+                gdi.line(p.value, e.value, 1, (255,255,255))
 
+                if pre.pred:
+                    gdi.line(e.value, pre.pred.ivalue, 1, (0,255,0))
+
+                if win32api.GetAsyncKeyState(0x12):
+                    evp = evade(e, p, math.radians(alpha))
+                    evn = evade(e, p, -math.radians(alpha))
+        
+                    move(*min_entity([evp, evn]).ivalue)
+
+                    win32api.mouse_event(0x0008, 0, 0, 0, 0)
+                    win32api.mouse_event(0x0010, 0, 0, 0, 0)
+            
     cap.terminate()
