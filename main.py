@@ -80,10 +80,13 @@ class Predictor(threading.Thread):
                 e1 = min_entity(find_enemies(cap.img))
                 if e0 and e1:
                     d = e1 - e0
-                    self.pred = e1 + d.unite.dot((d.h/self.dt)*self.pt)
+                    if d.h < 100:
+                        self.pred = e1 + d.unite.dot((d.h/self.dt)*self.pt)
+                    else:
+                        self.pred = None                    
                 else:
                     self.pred = None
-
+                
 def find_color_contours(img, lower, upper):
     kernel0 = np.ones((4,4), np.uint8)
     kernel1 = np.ones((20,20), np.uint8)
@@ -146,7 +149,7 @@ if __name__ == '__main__':
     
     gdi = GDIDraw()
         
-    print('[@] League-of-Legends Skill-Shot AimBot')
+    print('[@] League-of-Legends::')
         
     hwnd = win32gui.FindWindow(0, 'League of Legends (TM) Client')
 
@@ -176,21 +179,23 @@ if __name__ == '__main__':
             if win32api.GetAsyncKeyState(0x51) or\
                 win32api.GetAsyncKeyState(0x57) or\
                 win32api.GetAsyncKeyState(0x52):
-                if e:
+                if pre.pred:
+                    move(*pre.pred.ivalue)
+                elif e:
                     move(*e.value) 
             
-            if p and e:
+            if p and e:            
                 gdi.circle(e.value, 30, 1, (255,0,255))
      
                 gdi.line(p.value, e.value, 1, (255,255,255))
-
+                
                 if pre.pred:
                     gdi.line(e.value, pre.pred.ivalue, 1, (0,255,0))
 
                 if win32api.GetAsyncKeyState(0x12):
                     evp = evade(e, p, math.radians(alpha))
                     evn = evade(e, p, -math.radians(alpha))
-        
+                                                
                     move(*min_entity([evp, evn]).ivalue)
 
                     win32api.mouse_event(0x0008, 0, 0, 0, 0)
