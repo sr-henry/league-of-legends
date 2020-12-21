@@ -74,9 +74,9 @@ class Predictor(threading.Thread):
     def run(self):
         while cap.on: 
             if not cap.img is None:
-                e0 = min_entity(find_enemies(cap.img))
+                e0 = min_entity(mouse(), find_enemies(cap.img))
                 time.sleep(self.dt)
-                e1 = min_entity(find_enemies(cap.img))
+                e1 = min_entity(mouse(), find_enemies(cap.img))
                 if e0 and e1:
                     d = e1 - e0
                     if d.h < 100:
@@ -89,7 +89,10 @@ class Predictor(threading.Thread):
 def move(x, y):
     x0, y0 = win32api.GetCursorPos()
     win32api.mouse_event(0x0001, x-x0, y-y0, 0, 0)
-                
+
+def mouse():
+    return Vec2(*win32api.GetCursorPos())
+
 def find_color_contours(img, lower, upper):
     kernel0 = np.ones((5,5), np.uint8)
     kernel1 = np.ones((20,20), np.uint8)
@@ -112,10 +115,9 @@ def find_enemies(img):
             enemies.append(e)
     return enemies
 
-def min_entity(entities):
+def min_entity(m, entities):
     md = math.inf
     me = None
-    m = Vec2(*win32api.GetCursorPos())
     for e in entities:
         d = (e-m).h
         if d < md:
@@ -194,11 +196,14 @@ def pid(err):
     return pid_value
 
     
-def kite(p, e, aar):    
+def kite(p, aar):
+    e = min_entity(p, find_enemies(cap.img))
+
+    if not e:
+        return
+        
     p += offset ## fix center
     
-    gdi.line(p.ivalue, e.ivalue, 2, (255,255,255))
-
     d = e - p
 
     a, b = aar
@@ -227,7 +232,9 @@ def kite(p, e, aar):
 #        print('push')
 #    elif is_inside:
 #        print('pull')
- 
+
+    gdi.elipse(p.ivalue, a, b, 2, (255,255,255))
+    gdi.line(p.ivalue, e.ivalue, 2, (255,255,255))
     gdi.line(p.ivalue, z.ivalue, 2, (255,0,0))
     gdi.circle(z.ivalue, 5, 4, (255,0,0))    
     gdi.circle(op.ivalue, 5, 4, (255,255,0))    
@@ -269,7 +276,7 @@ if __name__ == '__main__':
     while not win32api.GetAsyncKeyState(win32con.VK_HOME):            
         if not cap.img is None:
             
-            e = min_entity(find_enemies(cap.img))
+            e = min_entity(mouse(), find_enemies(cap.img))
             p = local_player(cap.img)
 
             ## check to create last hit (auto-farm)
@@ -281,16 +288,15 @@ if __name__ == '__main__':
                 if e:
                     move(*(e + pre.pred).ivalue)
             if p:
-                gdi.elipse((p+offset).ivalue, aarange[0], aarange[1], 2, (255,255,255))
-                
+                kite(p, aarange)
+                     
             if win32api.GetAsyncKeyState(0x73) and e:
                 move(*e.ivalue)
                 win32api.mouse_event(0x0008, 0, 0, 0, 0)
                 win32api.mouse_event(0x0010, 0, 0, 0, 0)
                         
             if p and e:
-                kite(p, e, aarange)
-                    
+                gdi.line(p.value, e.value, 2, (255, 147, 39))
                 gdi.circle(e.value, 30, 2, (255,0,255))     
                 
                 if pre.pred:
@@ -300,7 +306,7 @@ if __name__ == '__main__':
 #                    evp = evade(e, p, math.radians(alpha))
 #                    evn = evade(e, p, -math.radians(alpha))
 #                                                
-#                    move(*min_entity([evp, evn]).ivalue)
+#                    move(*min_entity(mouse(), [evp, evn]).ivalue)
 #
 #                    win32api.mouse_event(0x0008, 0, 0, 0, 0)
 #                    win32api.mouse_event(0x0010, 0, 0, 0, 0)
