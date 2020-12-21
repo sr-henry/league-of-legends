@@ -6,7 +6,6 @@ import win32con
 import win32gui
 import threading
 import numpy as np
-
 from wnd_cap import capture
 from GDI import GDIDraw
 
@@ -63,14 +62,14 @@ class Vec2:
         return Vec2(self.x * v.x, self.y * v.y)
     
     def __str__(self):
-        return '(%f : %f)'%(self.x, self.y)     
+        return '(%.3f:%.3f)'%(self.x, self.y)     
 
 class Predictor(threading.Thread):
     def __init__(self):
         threading.Thread.__init__(self)
-        self.pred = None
+        self.pred = Vec2(0,0)
         self.dt = 0.1
-        self.pt = 0.3
+        self.pt = 0.25
         
     def run(self):
         while cap.on: 
@@ -81,18 +80,22 @@ class Predictor(threading.Thread):
                 if e0 and e1:
                     d = e1 - e0
                     if d.h < 100:
-                        self.pred = e1 + d.unite.dot((d.h/self.dt)*self.pt)
+                        self.pred = d.unite.dot((d.h/self.dt)*self.pt)
                     else:
-                        self.pred = None                    
+                        self.pred = Vec2(0,0)                    
                 else:
-                    self.pred = None
+                    self.pred = Vec2(0,0)
+
+def move(x, y):
+    x0, y0 = win32api.GetCursorPos()
+    win32api.mouse_event(0x0001, x-x0, y-y0, 0, 0)
                 
 def find_color_contours(img, lower, upper):
-    kernel0 = np.ones((4,4), np.uint8)
+    kernel0 = np.ones((5,5), np.uint8)
     kernel1 = np.ones((20,20), np.uint8)
     mask = cv2.inRange(img, lower, upper)
     mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel0)
-    mask = cv2.dilate(mask, kernel1, iterations = 1)
+    mask = cv2.dilate(mask, kernel1, iterations=1)
     ret = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
     return ret[0] if len(ret) == 2 else ret[1]
     
@@ -129,76 +132,140 @@ def local_player(img):
         if approx.size == 8:
             x, y, w, h = cv2.boundingRect(approx)
             _x, _y = (x + w, y + h)
-            if np.array_equal(img[_y-22][_x-2], [33, 138, 49]):
+            if np.array_equal(img[_y-22][_x-2], [41, 146, 66]):
                 return Vec2(_x + offsetx, _y + offsety)
+
+def find_minions(img):
+    minions = []
+
+    l = np.array([88, 81, 197])
+    u = np.array([255,91,197])
+
+    mask = cv2.inRange(img, l, u)
+    mask = cv2.dilate(mask, np.ones((4,4), np.uint8), iterations=1)
+
+    ret = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+    ret = ret[0] if len(ret) == 2 else ret[1]
+
+    offsetx = 30
+    offsety = 32
+
+    for c in ret:
+        approx = cv2.approxPolyDP(c, 0.1*cv2.arcLength(c, True), True)
+        x, y, w, h = cv2.boundingRect(approx)
+        if approx.size == 4 and w <= 63: 
+            _x, _y = x + offsetx, y + offsety
+            if w <= 16:
+                gdi.circle((_x,_y), 15, 2, (181,106,6))
+            gdi.text(str(w), (_x,_y,_x,_y))
+            minions.append((_x,_y))
+
+    return mask
                 
 def evade(p0, p1, a):
     vec_d = p1-p0
     de = math.tan(a)*vec_d.h
-    b = math.radians(180) - math.atan(vec_d.tan)        
+    b = math.pi - math.atan(vec_d.tan)        
     dy = de*math.sin(b)
     dx = de*math.cos(b)
     v = Vec2(dx,dy)
     return p1 + v
 
-def move(x,y):
-    x0, y0 = win32api.GetCursorPos()
-    win32api.mouse_event(0x0001, x-x0, y-y0, 0, 0)
- 
-if __name__ == '__main__':
+def check_inside(c, r, p):
+    rd = (p[0]-c[0])**2/r[0]**2 + (p[1]-c[1])**2/r[1]**2 
+    if rd <= 1:
+        return True
+    return False
     
-    gdi = GDIDraw()
+def kite(p, e, aar):
+    p += offset ## fix center
+
+    gdi.line(p.ivalue, e.ivalue, 2, (255,255,255))
+
+    d = e - p
+
+    a, b = aar
+    m = d.tan
+    c = math.sqrt((a*a - b*b))
+    e = c/a
+
+    k =  math.atan(m)
+
+    r = b/math.sqrt(1-(e*math.cos(k + math.pi/2))**2)
+
+    t = p + d.unite.dot(r)
         
-    print('[@] League-of-Legends::')
+    gdi.circle(t.ivalue, 5, 4, (0,255,255))
+    
+    
+if __name__ == '__main__':
         
+    print('[@] Legit Hack League-of-Legends:: v.0')
+
     hwnd = win32gui.FindWindow(0, 'League of Legends (TM) Client')
 
     if not hwnd:
         print('[!] Game not found')
         quit()
 
-    ## Window Capture
+    print('[HOME] - Exit')
+
+    gdi = GDIDraw()
+    
     cap = WndCap(hwnd)
     cap.setDaemon(True)
     cap.start()
 
-    ## Moviment Predictor
     pre = Predictor()
     pre.setDaemon(True)
     pre.start()
 
-    ## Evade angle
-    alpha = 15
+    alpha = 20
+
+    # auto-atack range Ezreal
+    aarange = (290, 240)
+
+    # fix local player for aa range
+    offset = Vec2(3, 51)
 
     while not win32api.GetAsyncKeyState(win32con.VK_HOME):            
         if not cap.img is None:
-
+            
             e = min_entity(find_enemies(cap.img))
             p = local_player(cap.img)
- 
+
+            ## check to create last hit (auto-farm)
+            ## find_minions(cap.img)
+        
             if win32api.GetAsyncKeyState(0x51) or\
                 win32api.GetAsyncKeyState(0x57) or\
                 win32api.GetAsyncKeyState(0x52):
-                if pre.pred:
-                    move(*pre.pred.ivalue)
-                elif e:
-                    move(*e.value) 
-            
-            if p and e:            
-                gdi.circle(e.value, 30, 1, (255,0,255))
-     
-                gdi.line(p.value, e.value, 1, (255,255,255))
+                if e:
+                    move(*(e + pre.pred).ivalue)
+            if p:
+                gdi.elipse((p+offset).ivalue, aarange[0], aarange[1], 2, (255,255,255))
+                
+            if win32api.GetAsyncKeyState(0x73) and e:
+                move(*e.ivalue)
+                win32api.mouse_event(0x0008, 0, 0, 0, 0)
+                win32api.mouse_event(0x0010, 0, 0, 0, 0)
+                        
+            if p and e:
+                kite(p, e, aarange)
+                    
+                gdi.circle(e.value, 30, 2, (255,0,255))     
                 
                 if pre.pred:
-                    gdi.line(e.value, pre.pred.ivalue, 1, (0,255,0))
+                    gdi.line(e.value, (e + pre.pred).ivalue, 2, (0, 255, 0))
 
-                if win32api.GetAsyncKeyState(0x12):
-                    evp = evade(e, p, math.radians(alpha))
-                    evn = evade(e, p, -math.radians(alpha))
-                                                
-                    move(*min_entity([evp, evn]).ivalue)
+#                if win32api.GetAsyncKeyState(0x12):
+#                    evp = evade(e, p, math.radians(alpha))
+#                    evn = evade(e, p, -math.radians(alpha))
+#                                                
+#                    move(*min_entity([evp, evn]).ivalue)
+#
+#                    win32api.mouse_event(0x0008, 0, 0, 0, 0)
+#                    win32api.mouse_event(0x0010, 0, 0, 0, 0)
 
-                    win32api.mouse_event(0x0008, 0, 0, 0, 0)
-                    win32api.mouse_event(0x0010, 0, 0, 0, 0)
-            
+    cv2.destroyAllWindows()       
     cap.terminate()
