@@ -6,12 +6,20 @@
 - Aim-Lock
 - Moviment Predictor (simple)
 - GDI Overlay (out-game)
-- Calculation of position for evasion
+- Evade (line)
+- Minion detect
+
+### Under Development
+* auto kite (PID)
 
 ### TODOS
-* ~~Implements the evade functionality~~
-* Adjust the evade distance angle based on enemy distance
-* ~~Fix the moviment predictor when you switch the enemy~~ 
+* spell route calculation
+* evade
+    * circles
+    * rings
+    * cones
+* adjust the evade distance angle based on enemy distance
+* adjust the aa range based in the player offset
 
 ### Demo
 https://www.youtube.com/watch?v=dRQHbZ8_4GU
