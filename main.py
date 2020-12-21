@@ -173,13 +173,30 @@ def evade(p0, p1, a):
 
 def check_inside(c, r, p):
     rd = (p[0]-c[0])**2/r[0]**2 + (p[1]-c[1])**2/r[1]**2 
-    if rd <= 1:
+    if rd <= 1.4:
         return True
     return False
-    
-def kite(p, e, aar):
-    p += offset ## fix center
 
+def pid(err):
+    global previous_error
+
+    Kp, Ki, Kd = 3, 0, 0
+    I = 0
+    
+    P = err
+    I += previous_error
+    D = err - previous_error
+
+    pid_value = (Kp * P) + (Ki * I) + (Kd * D)    
+
+    previous_error = err    
+
+    return pid_value
+
+    
+def kite(p, e, aar):    
+    p += offset ## fix center
+    
     gdi.line(p.ivalue, e.ivalue, 2, (255,255,255))
 
     d = e - p
@@ -187,14 +204,20 @@ def kite(p, e, aar):
     a, b = aar
     m = d.tan
     c = math.sqrt((a*a - b*b))
-    e = c/a
+    e = c/a    
 
-    k =  math.atan(m)
+    k = math.atan(m)
 
     r = b/math.sqrt(1-(e*math.cos(k + math.pi/2))**2)
 
     t = p + d.unite.dot(r)
-        
+
+    err = d.h - (t-p).h
+
+    z = (p + d.unite.dot(pid(err))) 
+
+    gdi.line(p.ivalue, z.ivalue, 2, (255,0,0))
+    gdi.circle(z.ivalue, 5, 4, (255,0,0))    
     gdi.circle(t.ivalue, 5, 4, (0,255,255))
     
     
@@ -228,6 +251,8 @@ if __name__ == '__main__':
     # fix local player for aa range
     offset = Vec2(3, 51)
 
+    previous_error = 0
+    
     while not win32api.GetAsyncKeyState(win32con.VK_HOME):            
         if not cap.img is None:
             
