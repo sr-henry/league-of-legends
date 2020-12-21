@@ -180,7 +180,7 @@ def check_inside(c, r, p):
 def pid(err):
     global previous_error
 
-    Kp, Ki, Kd = 3, 0, 0
+    Kp, Ki, Kd = 1.5, 0, 0
     I = 0
     
     P = err
@@ -204,11 +204,11 @@ def kite(p, e, aar):
     a, b = aar
     m = d.tan
     c = math.sqrt((a*a - b*b))
-    e = c/a    
+    ec = c/a    
 
     k = math.atan(m)
 
-    r = b/math.sqrt(1-(e*math.cos(k + math.pi/2))**2)
+    r = b/math.sqrt(1-(ec*math.cos(k + math.pi/2))**2)
 
     t = p + d.unite.dot(r)
 
@@ -216,8 +216,21 @@ def kite(p, e, aar):
 
     z = (p + d.unite.dot(pid(err))) 
 
+    pid_distance = (p-z).h
+    is_inside = check_inside(p.ivalue, aar, e.ivalue)
+
+    op = p+d.unite.dot(-r)
+
+#    if pid_distance <= 40 and is_inside:
+#        print('hit')
+#    elif not is_inside:
+#        print('push')
+#    elif is_inside:
+#        print('pull')
+ 
     gdi.line(p.ivalue, z.ivalue, 2, (255,0,0))
     gdi.circle(z.ivalue, 5, 4, (255,0,0))    
+    gdi.circle(op.ivalue, 5, 4, (255,255,0))    
     gdi.circle(t.ivalue, 5, 4, (0,255,255))
     
     
