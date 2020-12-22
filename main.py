@@ -6,12 +6,8 @@ import win32con
 import win32gui
 import threading
 import numpy as np
-import pydirectinput
 from wnd_cap import capture
 from GDI import GDIDraw
-
-MOUSEEVENTF_RIGHTCLICK = 0x0008 + 0x0010
-MOUSEEVENTF_LEFTCLICK  = 0x0002 + 0x0004
 
 class WndCap(threading.Thread):
     def __init__(self, hwnd):
@@ -146,8 +142,7 @@ def find_minions(img):
     mask = cv2.dilate(mask, np.ones((4,4), np.uint8), iterations=1)
     ret = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
     ret = ret[0] if len(ret) == 2 else ret[1]
-    offsetx = 30
-    offsety = 32
+    offsetx, offsety = 30, 32
     for c in ret:
         approx = cv2.approxPolyDP(c, 0.1*cv2.arcLength(c, True), True)
         x, y, w, h = cv2.boundingRect(approx)
@@ -168,9 +163,9 @@ def evade(p0, p1, a):
     v = Vec2(dx,dy)
     return p1 + v
 
-def check_inside(c, r, p):
+def check_inside(c, r, p, t):
     rd = (p[0]-c[0])**2/r[0]**2 + (p[1]-c[1])**2/r[1]**2 
-    if rd <= 1.3:
+    if rd <= t:
         return True
     return False
 
@@ -191,13 +186,12 @@ def pid(err):
     return pid_value
 
     
-def kite(aar):
+def kite(aar, threshold_aar, dist_error):
     p = local_player(cap.img)
 
     if not p:
         return
     
-#    e = min_entity(p, find_enemies(cap.img))
     e = min_entity(mouse(), find_enemies(cap.img))
     if not e:
         return
@@ -223,40 +217,36 @@ def kite(aar):
     z = (p + d.unite.dot(pid(err))) 
 
     pid_distance = (p-z).h
-    is_inside = check_inside(p.ivalue, aar, e.ivalue)
+    is_inside = check_inside(p.ivalue, aar, e.ivalue, threshold_aar)
 
     op = p+d.unite.dot(-r)
 
-    color = (255,255,255)
-
-    threshold = 50
-
-    if win32api.GetAsyncKeyState(0x20):
-        if pid_distance < threshold and is_inside:
-            color = (255,0,0)
-        elif not is_inside:
-            move(*z.ivalue)  
-            win32api.mouse_event(0x0008, 0, 0, 0, 0)
-            time.sleep(.1)
-            win32api.mouse_event(0x0010, 0, 0, 0, 0)
+    if pid_distance < dist_error and is_inside:
+        # auto-atack
+        pass        
+     
+    elif not is_inside:
+        move(*z.ivalue)  
+        win32api.mouse_event(0x0008, 0, 0, 0, 0)
+        time.sleep(.1)
+        win32api.mouse_event(0x0010, 0, 0, 0, 0)
+        
+    elif is_inside:
+        move(*z.ivalue)
+        win32api.mouse_event(0x0008, 0, 0, 0, 0)
+        time.sleep(.1)
+        win32api.mouse_event(0x0010, 0, 0, 0, 0)
             
-        elif is_inside:
-            move(*z.ivalue)
-            win32api.mouse_event(0x0008, 0, 0, 0, 0)
-            time.sleep(.1)
-            win32api.mouse_event(0x0010, 0, 0, 0, 0)
-            
-#    gdi.circle(p.ivalue, threshold, 2, (255,255,0))
+#    gdi.circle(p.ivalue, dist_error, 2, (255,255,0))
 #    gdi.elipse(p.ivalue, a, b, 2, (255,255,255))
-#    gdi.line(p.ivalue, e.ivalue, 2, color)
+#    gdi.line(p.ivalue, e.ivalue, 2, (255,255,255))
 #    gdi.line(p.ivalue, z.ivalue, 2, (255,0,0))
 #    gdi.circle(z.ivalue, 5, 4, (255,0,0))    
 #    gdi.circle(op.ivalue, 5, 4, (255,255,0))    
 #    gdi.circle(t.ivalue, 5, 4, (0,255,255))
-    
-    
+
+
 if __name__ == '__main__':
-        
     print('[@] Legit Hack League-of-Legends:: v.0')
 
     hwnd = win32gui.FindWindow(0, 'League of Legends (TM) Client')
@@ -264,11 +254,11 @@ if __name__ == '__main__':
     if not hwnd:
         print('[!] Game not found')
         quit()
-
+        
     print('[HOME] - Exit')
 
 #    gdi = GDIDraw()
-    
+
     cap = WndCap(hwnd)
     cap.setDaemon(True)
     cap.start()
@@ -290,16 +280,15 @@ if __name__ == '__main__':
     
     while not win32api.GetAsyncKeyState(win32con.VK_HOME):            
         if not cap.img is None:
-        
+
             if win32api.GetAsyncKeyState(0x51) or\
                 win32api.GetAsyncKeyState(0x57) or\
                 win32api.GetAsyncKeyState(0x52):
                 e = min_entity(mouse(), find_enemies(cap.img))
                 if e:
                     move(*(e + pre.pred).ivalue)
-            
-           # if win32api.GetAsyncKeyState(0x20):
-            kite(aarange)
 
-    cv2.destroyAllWindows()       
+            if win32api.GetAsyncKeyState(0x20):
+                kite(aarange, 1.4, 40)
+
     cap.terminate()
