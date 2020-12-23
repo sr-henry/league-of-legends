@@ -74,7 +74,6 @@ class Predictor(threading.Thread):
     def run(self):
         while cap.on: 
             if not cap.img is None:
-                self.pred = Vec2(0,0)
                 e0 = min_entity(mouse(), find_enemies(cap.img))
                 time.sleep(self.dt)
                 e1 = min_entity(mouse(), find_enemies(cap.img))
@@ -82,6 +81,10 @@ class Predictor(threading.Thread):
                     d = e1 - e0
                     if d.h < 100:
                         self.pred = d.unite.dot((d.h/self.dt)*self.pt)
+                    else:
+                        self.pred = Vec2(0,0)
+                else:
+                    self.pred = Vec2(0,0)
                     
 def move(x, y):
     x0, y0 = win32api.GetCursorPos()
@@ -217,22 +220,28 @@ def kite(aar, threshold_aar, dist_error):
     z = (p + d.unite.dot(pid(err))) 
 
     pid_distance = (p-z).h
+   
     is_inside = check_inside(p.ivalue, aar, e.ivalue, threshold_aar)
 
     op = p+d.unite.dot(-r)
+    
+    ## normalizer
+#    player_pred = p + pre.pred.dot(-1)
+#    
+#    cost = (-((player_pred - z).h**2)+(player_pred.h**2)+(z.h**2))/(2*player_pred.h*z.h)
+#     
+#    theta = math.acos(cost)
+#    
+#    print(math.degrees(theta))
+#
+#    gdi.line(p.ivalue, player_pred.ivalue, 2, (128,0,128))
 
     if pid_distance < dist_error and is_inside:
         # auto-atack
         pass        
      
-    elif not is_inside:
+    else:
         move(*z.ivalue)  
-        win32api.mouse_event(0x0008, 0, 0, 0, 0)
-        time.sleep(.1)
-        win32api.mouse_event(0x0010, 0, 0, 0, 0)
-        
-    elif is_inside:
-        move(*z.ivalue)
         win32api.mouse_event(0x0008, 0, 0, 0, 0)
         time.sleep(.1)
         win32api.mouse_event(0x0010, 0, 0, 0, 0)
@@ -257,7 +266,7 @@ if __name__ == '__main__':
         
     print('[HOME] - Exit')
 
-#    gdi = GDIDraw()
+    gdi = GDIDraw()
 
     cap = WndCap(hwnd)
     cap.setDaemon(True)
@@ -290,5 +299,5 @@ if __name__ == '__main__':
 
             if win32api.GetAsyncKeyState(0x20):
                 kite(aarange, 1.4, 40)
-
+    
     cap.terminate()
