@@ -6,63 +6,12 @@ import win32con
 import win32gui
 import threading
 import numpy as np
-from wnd_cap import capture
+
+## local modules
+import api
+from wnd import WndCap
 from GDI import GDIDraw
-
-class WndCap(threading.Thread):
-    def __init__(self, hwnd):
-        threading.Thread.__init__(self)
-        self.on = True
-        self.hwnd = hwnd
-        self.img = None 
-
-    def run(self):
-        while self.on:
-            self.img = cv2.cvtColor(capture(self.hwnd), cv2.COLOR_RGBA2RGB)
-
-    def terminate(self):
-        self.on = False
-
-class Vec2:
-    def __init__(self, x, y):
-        self.x = x
-        self.y = y
-        self.h = math.hypot(x, y)
-
-    @property
-    def ivalue(self):
-        return int(self.x), int(self.y)
-
-    @property
-    def value(self):
-        return self.x, self.y
-
-    @property
-    def unite(self):
-        if self.h == 0:
-            return Vec2(0, 0)
-        return Vec2(self.x/self.h, self.y/self.h)
-
-    @property
-    def tan(self):
-        if self.y == 0:
-            return 0
-        return self.x/self.y
-
-    def dot(self, n):
-        return Vec2(self.x * n, self.y * n)
-
-    def __add__(self, v):
-        return Vec2(self.x + v.x, self.y + v.y)
-     
-    def __sub__(self, v):
-        return Vec2(self.x - v.x, self.y - v.y)
-
-    def __mul__(self, v):
-        return Vec2(self.x * v.x, self.y * v.y)
-    
-    def __str__(self):
-        return '(%.3f:%.3f)'%(self.x, self.y)     
+from vec import Vec2
 
 class Predictor(threading.Thread):
     def __init__(self):
@@ -85,13 +34,13 @@ class Predictor(threading.Thread):
                         self.pred = Vec2(0,0)
                 else:
                     self.pred = Vec2(0,0)
+
+def mouse():
+    return Vec2(*win32api.GetCursorPos())
                     
 def move(x, y):
     x0, y0 = win32api.GetCursorPos()
     win32api.mouse_event(0x0001, x-x0, y-y0, 0, 0)
-
-def mouse():
-    return Vec2(*win32api.GetCursorPos())
 
 def find_color_contours(img, lower, upper):
     kernel0 = np.ones((5,5), np.uint8)
@@ -114,16 +63,6 @@ def find_enemies(img):
             e = Vec2(x + w + offsetx, y + h + offsety)
             enemies.append(e)
     return enemies
-
-def min_entity(m, entities):
-    md = math.inf
-    me = None
-    for e in entities:
-        d = (e-m).h
-        if d < md:
-            md = d
-            me = e
-    return me
 
 def local_player(img):
     l = np.array([35, 25, 0])
@@ -156,6 +95,16 @@ def find_minions(img):
             gdi.text(str(w), (_x,_y,_x,_y))
             minions.append((_x,_y))
     return mask
+
+def min_entity(m, entities):
+    md = math.inf
+    me = None
+    for e in entities:
+        d = (e-m).h
+        if d < md:
+            md = d
+            me = e
+    return me
                 
 def evade(p0, p1, a):
     vec_d = p1-p0
@@ -191,7 +140,6 @@ def pid(err):
     
 def kite(aar, threshold_aar, dist_error):
     p = local_player(cap.img)
-
     if not p:
         return
     
@@ -199,7 +147,6 @@ def kite(aar, threshold_aar, dist_error):
     if not e:
         return
 
-    e += pre.pred
     p += offset 
     
     d = e - p
@@ -225,41 +172,47 @@ def kite(aar, threshold_aar, dist_error):
 
     op = p+d.unite.dot(-r)
     
-    ## normalizer
-#    player_pred = p + pre.pred.dot(-1)
-#    
-#    cost = (-((player_pred - z).h**2)+(player_pred.h**2)+(z.h**2))/(2*player_pred.h*z.h)
-#     
-#    theta = math.acos(cost)
-#    
-#    print(math.degrees(theta))
-#
-#    gdi.line(p.ivalue, player_pred.ivalue, 2, (128,0,128))
+    ## normalizer here
 
-    if pid_distance < dist_error and is_inside:
-        # auto-atack
-        pass        
-     
-    else:
-        move(*z.ivalue)  
-        win32api.mouse_event(0x0008, 0, 0, 0, 0)
-        time.sleep(.1)
-        win32api.mouse_event(0x0010, 0, 0, 0, 0)
-            
-#    gdi.circle(p.ivalue, dist_error, 2, (255,255,0))
-#    gdi.elipse(p.ivalue, a, b, 2, (255,255,255))
-#    gdi.line(p.ivalue, e.ivalue, 2, (255,255,255))
-#    gdi.line(p.ivalue, z.ivalue, 2, (255,0,0))
-#    gdi.circle(z.ivalue, 5, 4, (255,0,0))    
-#    gdi.circle(op.ivalue, 5, 4, (255,255,0))    
-#    gdi.circle(t.ivalue, 5, 4, (0,255,255))
+    if win32api.GetAsyncKeyState(0x20):    
+        if pid_distance < dist_error and is_inside:
+            # auto-atack
+            pass        
+         
+        else:
+            move(*z.ivalue)  
+            win32api.mouse_event(0x0008, 0, 0, 0, 0)
+            time.sleep(.1)
+            win32api.mouse_event(0x0010, 0, 0, 0, 0)
+                
+    gdi.circle(p.ivalue, dist_error, 2, (255,255,0))
+    gdi.elipse(p.ivalue, a, b, 2, (255,255,255))
+    gdi.line(p.ivalue, e.ivalue, 2, (255,255,255))
+    gdi.line(p.ivalue, z.ivalue, 2, (255,0,0))
+    gdi.circle(z.ivalue, 5, 4, (255,0,0))    
+    gdi.circle(op.ivalue, 5, 4, (255,255,0))    
+    gdi.circle(t.ivalue, 5, 4, (0,255,255))
 
+def approx_aar(aar, cx, cy):
+    # only for fix camera mode
+    # just a simple approximation based on de player position 
+    # and the yaw value of the fix camera and max zoon out
+    w, h = win32api.GetSystemMetrics(0), win32api.GetSystemMetrics(1)
+    r = aar/2
+    x = (6.63636363636364*cx)/(0.45900439238653*w)
+    y = -(12.727272727272734*cy)/(0.47265625*h)
+    return int(r+r*x/100), int(r+r*y/100)
+
+def get_champion_name():
+    summoner_name = api.playername()
+    for e in api.playerlist():
+        e['summonerName'] == summoner_name
+        return e['championName']
 
 if __name__ == '__main__':
     print('[@] Legit Hack League-of-Legends:: v.0')
 
     hwnd = win32gui.FindWindow(0, 'League of Legends (TM) Client')
-
     if not hwnd:
         print('[!] Game not found')
         quit()
@@ -279,16 +232,22 @@ if __name__ == '__main__':
     # line evade angle
     alpha = 20
 
-    # auto-atack range Ezreal
-    aarange = (290, 240)
-
-    # fix local player for aa range
-    offset = Vec2(3, 51)
+    # auto-atack range
+    player_stats = api.activeplayer()['champonStats']
+    aarange =  player_stats['attackRange']
+    
+    # fix local player for aarange
+    offset = Vec2(0, 35)
 
     previous_error = 0
     
     while not win32api.GetAsyncKeyState(win32con.VK_HOME):            
         if not cap.img is None:
+
+            p = local_player(cap.img)
+
+            if p:
+                aar = approx_aar(aarange, p.x, p.y)
 
             if win32api.GetAsyncKeyState(0x51) or\
                 win32api.GetAsyncKeyState(0x57) or\
@@ -297,7 +256,6 @@ if __name__ == '__main__':
                 if e:
                     move(*(e + pre.pred).ivalue)
 
-            if win32api.GetAsyncKeyState(0x20):
-                kite(aarange, 1.4, 40)
-    
+            kite(aar, 1.4, 40)
+
     cap.terminate()
