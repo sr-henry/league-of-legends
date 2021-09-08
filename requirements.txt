@@ -1,6 +1,6 @@
 numpy==1.19.3
 opencv-python==4.4.0.46
-Pillow==8.1.1
+Pillow==8.3.2
 pywin32==300
 six==1.15.0
 wxPython==4.1.1
